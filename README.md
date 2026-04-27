@@ -1,5 +1,7 @@
 # AutoMLIP
 
+**Status**: Under active development. The core pipeline is functional but some features are still being tested. Bug reports and feedback are welcome.
+
 Automated training of machine learning interatomic potentials with active learning.
 
 Supports **GAP**, **MACE** and **NequIP** backends. Uses Quantum ESPRESSO for DFT reference calculations. Runs on HPC clusters (SLURM, PBS) or local workstations.
@@ -9,17 +11,6 @@ Supports **GAP**, **MACE** and **NequIP** backends. Uses Quantum ESPRESSO for DF
 ```bash
 pip install -e .
 
-# For GAP:
-pip install -e ".[gap]"
-
-# For MACE:
-pip install -e ".[mace]"
-
-# For NequIP:
-pip install -e ".[nequip]"
-
-# Everything:
-pip install -e ".[all]"
 ```
 
 You also need Quantum ESPRESSO (`pw.x`) installed and accessible.
