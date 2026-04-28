@@ -2,9 +2,7 @@
 
 **Status**: Under active development. The core pipeline is functional but some features are still being tested. Bug reports and feedback are welcome.
 
-Automated training of machine learning interatomic potentials with active learning. Supports GAP, MACE, and NequIP. Uses Quantum ESPRESSO for DFT labelling. Runs on SLURM, PBS, or a local workstation.
-
-No CLI. Python API only.
+Automated training of machine learning interatomic potentials with active learning. Supports GAP, MACE and NequIP. Uses Quantum ESPRESSO for DFT labelling. Runs on SLURM, PBS or a local workstation.
 
 ## Install
 
@@ -40,13 +38,13 @@ Each iteration:
 2. Run Langevin MD with the lead model (first committee member) to generate snapshots.
 3. Predict energies/forces on all snapshots with every committee member.
 4. Score each snapshot by mean force std across the committee (QBC).
-5. Select high-disagreement snapshots (top fraction, or above a threshold if set). Cap at `max_new_per_iter`.
-6. Label selected structures with DFT (submitted as job arrays on SLURM/PBS, or run locally).
+5. Select high-disagreement snapshots (top fraction or above a threshold if set). Cap at `max_new_per_iter`.
+6. Label selected structures with DFT (submitted as job arrays on SLURM/PBS or run locally).
 7. Add labelled structures to the training set.
 8. Retrain the committee.
 9. Check convergence.
 
-Convergence stops the loop if any of these hold: RMSE is below tolerance (both energy and force), no new structures were selected by QBC, max iterations reached, or tau_acc exceeds the target (if enabled).
+Convergence stops the loop if any of these hold: RMSE is below tolerance (both energy and force), no new structures were selected by QBC, max iterations reached or tau_acc exceeds the target (if enabled).
 
 ## Usage
 
@@ -142,7 +140,7 @@ See `examples/example_abn.py` for a complete working example.
 
 ## Config reference
 
-All config is done through dataclasses in `automlip/config.py`. No YAML, no config files.
+All config is done through dataclasses in `automlip/config.py`.
 
 ### SystemConfig
 
@@ -174,7 +172,7 @@ All config is done through dataclasses in `automlip/config.py`. No YAML, no conf
 
 | Field | Default | What it does |
 | --- | --- | --- |
-| `backend` | `"gap"` | `"gap"`, `"mace"`, or `"nequip"` |
+| `backend` | `"gap"` | `"gap"`, `"mace"` or `"nequip"` |
 | `committee_size` | `3` | Number of models in the committee |
 | `bootstrap_fraction` | `0.8` | Fraction of data per bootstrap sample (GAP only) |
 | `device` | `"auto"` | `"auto"`, `"cpu"`, `"cuda"`, `"cuda:0"`. Ignored for GAP |
@@ -253,7 +251,7 @@ tau_acc convergence settings (all top-level on Config):
 
 tau_acc measures how long the MLIP can run MD before its cumulative energy error against DFT exceeds a threshold. Higher tau_acc = more reliable potential.
 
-Every `tau_check_interval` AL iterations, the pipeline picks the `tau_n_configs` lowest-energy structures from the training set, runs Velocity Verlet MD with the lead model, and at every `tau_interval_fs` compares the MLIP energy against a DFT single-point. Error above `tau_e_lower` accumulates. When cumulative error exceeds `tau_e_thresh`, that trajectory's tau_acc is the elapsed time. The final tau_acc is the mean across configs.
+Every `tau_check_interval` AL iterations, the pipeline picks the `tau_n_configs` lowest-energy structures from the training set, runs Velocity Verlet MD with the lead model and at every `tau_interval_fs` compares the MLIP energy against a DFT single-point. Error above `tau_e_lower` accumulates. When cumulative error exceeds `tau_e_thresh`, that trajectory's tau_acc is the elapsed time. The final tau_acc is the mean across configs.
 
 The AL loop converges when tau_acc reaches `tau_max_fs`.
 
@@ -261,7 +259,7 @@ This is expensive -- each tau_acc evaluation runs multiple DFT single-points. Us
 
 ## Cleaning up QE scratch files
 
-QE writes wavefunctions, charge density, and other scratch to `tmp/` inside each calculation directory. For large systems this can be tens of GB per iteration. Set `cleanup_qe_scratch=True` to delete these after each labelling round:
+QE writes wavefunctions, charge density and other scratch to `tmp/` inside each calculation directory. For large systems this can be tens of GB per iteration. Set `cleanup_qe_scratch=True` to delete these after each labelling round:
 
 ```python
 Config(
@@ -306,7 +304,7 @@ Config(
 )
 ```
 
-`initial_data_path` can be a single file, a directory of `.extxyz`/`.xyz` files, or a list of paths.
+`initial_data_path` can be a single file, a directory of `.extxyz`/`.xyz` files or a list of paths.
 
 Frames without energy/forces are silently skipped. Non-periodic frames are also skipped by default.
 
