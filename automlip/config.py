@@ -145,3 +145,7 @@ class Config:
     tau_temp: float = 300.0
     tau_dt_fs: float = 1.0
     tau_n_configs: int = 5
+
+    # If True, delete QE scratch files (tmp/, *.wfc, *.mix, *.hub, etc.)
+    # after each labelling round to save disk. Keeps pw.in and pw.out.
+    cleanup_qe_scratch: bool = False

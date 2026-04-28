@@ -1,6 +1,7 @@
 """Main pipeline driver."""
 
 import logging
+import shutil
 from pathlib import Path
 from typing import List, Optional
 import numpy as np
@@ -15,6 +16,7 @@ from automlip.labeller import BatchLabeller
 from automlip.active.sampler import run_md_sampling
 from automlip.active.qbc import select_by_committee
 from automlip.active.convergence import check_convergence
+from automlip.active.tau_acc import compute_tau_acc
 from automlip.modes import run_pipeline as dispatch_mode
 
 logger = logging.getLogger("automlip.pipeline")
@@ -43,11 +45,15 @@ class Pipeline:
             return
 
         elif mode == "al_from_data":
-            initial_state = dispatch_mode(self.config, self.state)
-            self.training_data = initial_state["training_data"]
-            self.validation_data = initial_state["validation_data"]
-            self.model_paths = initial_state["model_paths"]
-            self.state.iteration = initial_state["start_iteration"]
+            self._try_restore()
+            if self.state.iteration == 0:
+                initial_state = dispatch_mode(self.config, self.state)
+                self.training_data = initial_state["training_data"]
+                self.validation_data = initial_state["validation_data"]
+                self.model_paths = initial_state["model_paths"]
+                self.state.iteration = initial_state["start_iteration"]
+                self.state.model_paths = [str(p) for p in self.model_paths]
+                save_checkpoint(self.state, self.training_data, self.validation_data, self.work_dir)
             self._phase_active_learning_loop()
             self._finalise()
 
@@ -84,6 +90,9 @@ class Pipeline:
 
         labeller = BatchLabeller(self.config.dft, self.config.scheduler)
         labelled, failed = labeller.label(structures, self.work_dir / "iter_000", iteration=0)
+
+        if self.config.cleanup_qe_scratch:
+            _cleanup_qe_scratch(self.work_dir / "iter_000")
 
         if not labelled:
             raise RuntimeError("No structures labelled in initial phase")
@@ -150,6 +159,29 @@ class Pipeline:
                 self.validation_data, self.model_paths[0],
             )
 
+            # Optionally compute tau_acc.
+            tau_acc_value = None
+            cfg = self.config
+            if cfg.use_tau_acc and iteration % cfg.tau_check_interval == 0:
+                logger.info("Computing tau_acc...")
+                lead_calc = trainer.get_calculator(self.model_paths[0])
+                dft_calc = labeller.calculator
+                tau_result = compute_tau_acc(
+                    self.training_data,
+                    ml_calculator=lead_calc,
+                    dft_calculator=dft_calc,
+                    e_lower=cfg.tau_e_lower,
+                    e_thresh=cfg.tau_e_thresh,
+                    max_time_fs=cfg.tau_max_fs,
+                    interval_fs=cfg.tau_interval_fs,
+                    temp=cfg.tau_temp,
+                    dt_fs=cfg.tau_dt_fs,
+                    n_configs=cfg.tau_n_configs,
+                    seed=self.config.seed + iteration,
+                )
+                tau_acc_value = tau_result.value
+                logger.info("tau_acc = %.1f fs (converged=%s)", tau_acc_value, tau_result.converged)
+
             # Check convergence.
             conv = check_convergence(
                 iteration=iteration, n_selected=n_selected,
@@ -158,6 +190,9 @@ class Pipeline:
                 rmse_energy_tol=ac.rmse_energy_tol,
                 rmse_force_tol=ac.rmse_force_tol,
                 stop_on_no_new=ac.stop_on_no_new,
+                tau_acc=tau_acc_value,
+                tau_max_fs=cfg.tau_max_fs,
+                use_tau_acc=cfg.use_tau_acc,
             )
 
             self.state.history.append({
@@ -165,6 +200,7 @@ class Pipeline:
                 "n_selected": n_selected, "rmse_energy": rmse_energy,
                 "rmse_force": rmse_force, "converged": conv.converged,
                 "reason": conv.reason,
+                "tau_acc": tau_acc_value,
             })
 
             if conv.converged:
@@ -176,6 +212,9 @@ class Pipeline:
             # Label selected candidates with DFT.
             iter_dir = self.work_dir / f"iter_{iteration:03d}"
             new_data, failed = labeller.label(candidates, iter_dir, iteration=iteration)
+
+            if self.config.cleanup_qe_scratch:
+                _cleanup_qe_scratch(iter_dir)
 
             if new_data:
                 self.training_data.extend(new_data)
@@ -206,3 +245,51 @@ class Pipeline:
         ase_write(str(self.work_dir / "final_training_set.extxyz"),
                   self.training_data, format="extxyz")
         save_checkpoint(self.state, self.training_data, self.validation_data, self.work_dir)
+
+
+def _cleanup_qe_scratch(iter_dir: Path) -> None:
+    """Delete QE scratch files from a labelling directory, keeping pw.in and pw.out.
+
+    Removes tmp/ directories (wavefunction, charge density, etc.) and
+    stray scratch files (*.wfc*, *.mix*, *.hub*, *.dat, *.xml, *.bar,
+    *.save). These can be tens of GB for large systems and are not
+    needed after energies and forces have been parsed.
+    """
+    if not iter_dir.is_dir():
+        return
+
+    scratch_globs = [
+        "*.wfc*", "*.mix*", "*.hub*", "*.dat", "*.xml",
+        "*.bar", "*.save", "*.restart_*", "*.igk*",
+    ]
+
+    n_removed = 0
+    bytes_freed = 0
+
+    for calc_dir in iter_dir.iterdir():
+        if not calc_dir.is_dir():
+            continue
+
+        # Remove tmp/ directories (the main space hog).
+        tmp_dir = calc_dir / "tmp"
+        if tmp_dir.is_dir():
+            for f in tmp_dir.rglob("*"):
+                if f.is_file():
+                    bytes_freed += f.stat().st_size
+            shutil.rmtree(tmp_dir)
+            n_removed += 1
+
+        # Remove stray scratch files in the calc dir itself.
+        for pattern in scratch_globs:
+            for f in calc_dir.glob(pattern):
+                if f.is_file():
+                    bytes_freed += f.stat().st_size
+                    f.unlink()
+                    n_removed += 1
+
+    if n_removed > 0:
+        mb_freed = bytes_freed / (1024 * 1024)
+        logger.info(
+            "QE cleanup in %s: removed %d items, freed %.1f MB",
+            iter_dir.name, n_removed, mb_freed,
+        )
