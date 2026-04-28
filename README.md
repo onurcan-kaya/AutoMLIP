@@ -1,12 +1,8 @@
 # AutoMLIP
 
-<<<<<<< HEAD
 **Status**: Under active development. The core pipeline is functional but some features are still being tested. Bug reports and feedback are welcome.
 
-Automated training of machine learning interatomic potentials with active learning.
-=======
 Automated training of machine learning interatomic potentials with active learning. Supports GAP, MACE, and NequIP. Uses Quantum ESPRESSO for DFT labelling. Runs on SLURM, PBS, or a local workstation.
->>>>>>> dcb9f3f (fix broken tau_acc)
 
 No CLI. Python API only.
 
@@ -14,10 +10,6 @@ No CLI. Python API only.
 
 ```
 pip install -e .
-<<<<<<< HEAD
-
-=======
->>>>>>> dcb9f3f (fix broken tau_acc)
 ```
 
 You also need `pw.x` (Quantum ESPRESSO) installed separately. Python >= 3.8.
