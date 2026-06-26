@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "automlip"
+version = "0.2.0"
+description = "Automated MLIP training, finetuning and distillation with active learning"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "ase",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+mace = ["mace-torch"]
+nequip = ["nequip"]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["automlip*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

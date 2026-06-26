@@ -1,0 +1,21 @@
+#!/bin/bash
+# Submit the AutoMLIP driver on a GPU node that can also run qsub.
+# Resubmitting this after a walltime kill resumes from the last completed
+# active-learning iteration (same work_dir).
+#
+#   qsub submit_driver.pbs
+#
+#PBS -N abno_driver
+#PBS -l nodes=1:ppn=8:gpus=1
+#PBS -l walltime=24:00:00
+#PBS -q <your_gpu_queue>
+#PBS -A cnm84219
+#PBS -j oe
+
+cd "$PBS_O_WORKDIR"
+
+# module load python / mace / cuda / quantum-espresso as needed, e.g.:
+# module load conda && conda activate automlip
+# module load quantum-espresso
+
+python run_carbon_bno.py
