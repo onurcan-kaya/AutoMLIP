@@ -1016,7 +1016,3 @@ MACE and NequIP build committees by training with different random seeds on the 
 
 When finetuning, each committee member starts from the same foundation model weights but trains with a different seed.
 
-
-## License
-
-MIT.
