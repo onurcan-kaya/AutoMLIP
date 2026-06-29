@@ -196,6 +196,9 @@ class Pipeline:
 		self.train_data = data
 		self.val_data = []
 
+		ase_write(str(self.work_dir / "training_data.extxyz"),
+				  self.train_data, format="extxyz")
+
 		trainer = make_trainer(self.config.system, self.config.trainer)
 		model_dir = self.work_dir / "models"
 		self.model_paths = trainer.train_committee(
@@ -204,8 +207,6 @@ class Pipeline:
 			restart=self.resume,
 		)
 
-		ase_write(str(self.work_dir / "training_data.extxyz"),
-				  self.train_data, format="extxyz")
 		logger.info("Done. Models in %s", model_dir)
 
 	# ----------------------------------------------------------------
